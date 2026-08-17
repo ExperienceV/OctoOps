@@ -4,9 +4,9 @@
   "description": "Hoy en día, monitorizar infraestructura y monitorizar dispositivos físicos/IoT son dos mundos que casi nunca se hablan. Existen herramientas maduras para lo primero (Zabbix, Netdata, Grafana + Prometheus) y plataformas separadas para lo segundo (Home Assistant, ThingsBoard, plataformas cloud de fabricantes de sensores). Si alguien administra servidores Linux **y** además tiene proyectos con microcontroladores (una incubadora, un invernadero, un tanque de agua, un taller), termina usando dos sistemas distintos, con dos logins, dos formas de configurar alertas, y ningún panorama unificado.",
   "main": "index.js",
   "scripts": {
-    "dev": "tsx watch src/server.ts",
+    "dev": "tsx watch src/index.ts",
     "build": "tsc",
-    "start": "node dist/server.js",
+    "start": "node dist/index.js",
     "typecheck": "tsc --noEmit"
   },
   "repository": {
