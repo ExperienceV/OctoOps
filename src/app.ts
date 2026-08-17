@@ -1,4 +1,5 @@
 import Fastify from "fastify";
+import { serverRoutes } from "./modules/server/routes.js";
 
 export function buildApp() {
     const app = Fastify({
@@ -11,6 +12,10 @@ export function buildApp() {
             service: "octoops",
         };
     });
+
+    app.register(serverRoutes, 
+        { prefix: "/api" }
+    );
 
     return app;
 }
