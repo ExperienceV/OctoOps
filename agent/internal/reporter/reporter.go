@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"log"
 	"net/http"
 	"time"
 
@@ -80,6 +81,7 @@ func (r *Reporter) send(ctx context.Context) {
 
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Authorization", r.authToken)
+	log.Printf("Sending metrics request token=%s payload=%s", r.authToken, string(body))
 
 	response, err := r.client.Do(request)
 	if err != nil {

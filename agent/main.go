@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"os/signal"
 	"syscall"
@@ -13,6 +14,9 @@ import (
 )
 
 func main() {
+	log.SetFlags(log.Ldate | log.Ltime)
+	log.Println("Started")
+
 	cfg, err := config.LoadFromExecutableDir("config.json")
 	exitOnError(err)
 
