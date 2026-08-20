@@ -1,0 +1,10 @@
+{
+  "baseUrl": "https://octoops.com",
+  "intervalSeconds": 10,
+  "routes": {
+    "metrics": {
+      "path": "/metrics",
+      "method": "POST"
+    }
+  }
+}
