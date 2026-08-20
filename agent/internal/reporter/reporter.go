@@ -24,6 +24,7 @@ type Reporter struct {
 	method    string
 	interval  time.Duration
 	authToken string
+	token     string
 }
 
 func New(cfg config.Config, collector MetricsCollector) (*Reporter, error) {
@@ -41,6 +42,7 @@ func New(cfg config.Config, collector MetricsCollector) (*Reporter, error) {
 		method:    cfg.MetricsMethod(),
 		interval:  cfg.MetricsInterval(),
 		authToken: cfg.TokenHeader(),
+		token:     cfg.Token,
 	}, nil
 }
 
@@ -76,18 +78,32 @@ func (r *Reporter) send(ctx context.Context) {
 
 	request, err := http.NewRequestWithContext(requestCtx, r.method, r.endpoint, bytes.NewReader(body))
 	if err != nil {
+		log.Println("Algo a fallado")
 		return
 	}
 
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Authorization", r.authToken)
-	log.Printf("Sending metrics request token=%s payload=%s", r.authToken, string(body))
+	log.Printf("Sending metrics request token=%s payload=%s", maskToken(r.token), string(body))
 
 	response, err := r.client.Do(request)
 	if err != nil {
+		log.Println("Algo a fallado")
 		return
 	}
 	defer response.Body.Close()
 
+	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
+		log.Println("Algo a fallado")
+	}
+
 	_, _ = io.Copy(io.Discard, response.Body)
+}
+
+func maskToken(token string) string {
+	if len(token) <= 6 {
+		return token
+	}
+
+	return token[:3] + "........." + token[len(token)-3:]
 }
