@@ -2,3 +2,4 @@ node_modules
 dist
 OctoOps-Key.pem
 .env
+agent/agent
