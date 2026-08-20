@@ -11,6 +11,7 @@ import (
 )
 
 type Config struct {
+	Token           string `json:"token"`
 	BaseURL         string `json:"baseUrl"`
 	IntervalSeconds int    `json:"intervalSeconds"`
 	Routes          Routes `json:"routes"`
@@ -71,13 +72,22 @@ func (c Config) MetricsMethod() string {
 	return c.Routes.Metrics.Method
 }
 
+func (c Config) TokenHeader() string {
+	return "Bearer " + c.Token
+}
+
 func (c *Config) normalize() {
+	c.Token = strings.TrimSpace(c.Token)
 	c.BaseURL = strings.TrimSpace(c.BaseURL)
 	c.Routes.Metrics.Path = strings.TrimSpace(c.Routes.Metrics.Path)
 	c.Routes.Metrics.Method = strings.ToUpper(strings.TrimSpace(c.Routes.Metrics.Method))
 }
 
 func (c Config) validate() error {
+	if c.Token == "" {
+		return fmt.Errorf("config.json requiere token")
+	}
+
 	if c.BaseURL == "" {
 		return fmt.Errorf("config.json requiere baseUrl")
 	}

@@ -22,6 +22,7 @@ type Reporter struct {
 	endpoint  string
 	method    string
 	interval  time.Duration
+	authToken string
 }
 
 func New(cfg config.Config, collector MetricsCollector) (*Reporter, error) {
@@ -35,9 +36,10 @@ func New(cfg config.Config, collector MetricsCollector) (*Reporter, error) {
 		client: &http.Client{
 			Timeout: 5 * time.Second,
 		},
-		endpoint: endpoint,
-		method:   cfg.MetricsMethod(),
-		interval: cfg.MetricsInterval(),
+		endpoint:  endpoint,
+		method:    cfg.MetricsMethod(),
+		interval:  cfg.MetricsInterval(),
+		authToken: cfg.TokenHeader(),
 	}, nil
 }
 
@@ -77,6 +79,7 @@ func (r *Reporter) send(ctx context.Context) {
 	}
 
 	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Authorization", r.authToken)
 
 	response, err := r.client.Do(request)
 	if err != nil {

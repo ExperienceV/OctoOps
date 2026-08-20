@@ -1,4 +1,5 @@
 {
+  "token": "super-secret-token",
   "baseUrl": "https://octoops.com",
   "intervalSeconds": 10,
   "routes": {
