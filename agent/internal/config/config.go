@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
@@ -27,17 +28,30 @@ type Route struct {
 }
 
 func LoadFromExecutableDir(fileName string) (Config, error) {
-	executablePath, err := os.Executable()
+	configPath, err := resolveConfigPath(fileName)
 	if err != nil {
-		return Config{}, fmt.Errorf("no se pudo resolver la ruta del binario: %w", err)
+		return Config{}, err
 	}
 
-	return Load(filepath.Join(filepath.Dir(executablePath), fileName))
+	return Load(configPath)
+}
+
+func resolveConfigPath(fileName string) (string, error) {
+	executablePath, err := os.Executable()
+	if err != nil {
+		return "", fmt.Errorf("no se pudo resolver la ruta del ejecutable: %w", err)
+	}
+
+	return filepath.Join(filepath.Dir(executablePath), fileName), nil
 }
 
 func Load(path string) (Config, error) {
 	content, err := os.ReadFile(path)
 	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return Config{}, fmt.Errorf("no se encontro %s: %w", path, err)
+		}
+
 		return Config{}, fmt.Errorf("no se pudo leer %s: %w", path, err)
 	}
 
