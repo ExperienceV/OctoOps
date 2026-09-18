@@ -50,21 +50,19 @@ At this stage, it should only handle the essentials:
 - `id`
 - `serverId`
 - `cpuPercent`
-- `memoryPercent`
-- `diskPercent`
-- `netRxBps`
-- `netTxBps`
+- `memoryTotalBytes`
+- `memoryUsedBytes`
+- `memoryFreeBytes`
 - `recordedAt`
 
-## Base Metrics
+## Agent Metrics
 
-For now, the server agent only needs to report:
+For now, the server agent reports:
 
-- `cpuPercent`
-- `memoryPercent`
-- `diskPercent`
-- `netRxBps`
-- `netTxBps`
+- `cpu.percent`
+- `memory.total`
+- `memory.used`
+- `memory.free`
 
 ## First Stage Endpoints
 
@@ -80,11 +78,14 @@ All under `/api/v1`.
 
 ```json
 {
-  "cpuPercent": 21.4,
-  "memoryPercent": 67.2,
-  "diskPercent": 74.8,
-  "netRxBps": 125000,
-  "netTxBps": 42000
+  "cpu": {
+    "percent": 21.4
+  },
+  "memory": {
+    "total": 8589934592,
+    "used": 5767168000,
+    "free": 2822766592
+  }
 }
 ```
 

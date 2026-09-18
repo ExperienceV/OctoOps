@@ -10,11 +10,10 @@ export const metricsSchema = {
     properties: {
         cpu: {
             type: "object",
-            required: ["percent", "temp"],
+            required: ["percent"],
             additionalProperties: false,
             properties: {
                 percent: { type: "number" },
-                temp: { type: "number" },
             },
         },
         memory: {
@@ -32,7 +31,6 @@ export const metricsSchema = {
 
 export interface CpuMetrics {
     percent: number;
-    temp: number;
 }
 
 export interface MemMetrics {
