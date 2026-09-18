@@ -1,42 +1,24 @@
 import type { FastifyInstance } from "fastify";
-import { randomUUID } from "node:crypto";
 
-import { serverService } from "./service.js";
-import type { Server } from "./types.js";
+import { requireValidAgentToken } from "../../middleware/agent-auth.js";
+import { metricsSchema } from "./contract.js";
+import type { Metrics } from "./contract.js";
 
-export async function serverRoutes(app: FastifyInstance) {
-  app.get("/servers", async () => {
-    return serverService.getAll();
-  });
-
-  app.get<{ Params: { id: string } }>(
-    "/servers/:id",
-    async (request, reply) => {
-      const server = serverService.getById(request.params.id);
-
-      if (!server) {
-        return reply.status(404).send({
-          message: "Server not found",
-        });
-      }
-
-      return server;
+export async function metricsRoutes(app: FastifyInstance) {
+  app.post<{ Body: Metrics }>(
+    "/metrics",
+    {
+      preHandler: requireValidAgentToken,
+      schema: {
+        body: metricsSchema,
+      },
     },
-  );
+    async (request) => {
+      request.log.info({ metrics: request.body }, "metricas recibidas:");
 
-  app.post<{ Body: { name: string; hostname: string } }>(
-    "/servers",
-    async (request, reply) => {
-      const server: Server = {
-        id: randomUUID(),
-        name: request.body.name,
-        hostname: request.body.hostname,
-        status: "offline",
+      return {
+        message: "Metricas recibidas",
       };
-
-      serverService.create(server);
-
-      return reply.status(201).send(server);
     },
   );
 }
