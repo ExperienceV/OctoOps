@@ -14,11 +14,6 @@ func (Collector) Collect() (contracts.Metrics, error) {
 		return contracts.Metrics{}, err
 	}
 
-	cpuTemp, err := CPUTemp()
-	if err != nil {
-		return contracts.Metrics{}, err
-	}
-
 	memoryTotal, err := MemoryTotal()
 	if err != nil {
 		return contracts.Metrics{}, err
@@ -37,7 +32,6 @@ func (Collector) Collect() (contracts.Metrics, error) {
 	return contracts.Metrics{
 		CPU: contracts.CpuMetrics{
 			Percent: cpuPercent,
-			Temp:    cpuTemp,
 		},
 		Memory: contracts.MemMetrics{
 			Total: memoryTotal,

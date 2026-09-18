@@ -7,7 +7,6 @@ type Metrics struct {
 
 type CpuMetrics struct {
 	Percent float64 `json:"percent"`
-	Temp    float64 `json:"temp"`
 }
 
 type MemMetrics struct {

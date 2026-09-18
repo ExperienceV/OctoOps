@@ -2,7 +2,6 @@ package collector
 
 import (
 	"fmt"
-	"os"
 	"runtime"
 )
 
@@ -12,13 +11,4 @@ func ensureLinux() error {
 	}
 
 	return nil
-}
-
-func readFileIfExists(path string) string {
-	content, err := os.ReadFile(path)
-	if err != nil {
-		return ""
-	}
-
-	return string(content)
 }
