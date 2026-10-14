@@ -1,3 +1,9 @@
 OctoOps-Key.pem
 .env
 local
+
+# Rust
+target/
+
+# DB locales (si alguien levanta postgres sin docker)
+*.sqlite
