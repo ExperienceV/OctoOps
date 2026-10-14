@@ -1,13 +1,10 @@
-pub mod health;
-pub mod hello;
+pub mod report;
 
 use axum::Router;
 use sqlx::PgPool;
 
-pub use hello::ADDR;
+pub const ADDR: &str = "127.0.0.1:8000";
 
 pub fn router(db: PgPool) -> Router {
-    Router::new()
-        .merge(hello::router())
-        .merge(health::router(db))
+    Router::new().merge(report::router(db))
 }

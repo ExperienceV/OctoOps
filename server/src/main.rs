@@ -1,6 +1,6 @@
-mod contracts;
 mod db;
 mod routes;
+mod types;
 
 #[tokio::main]
 async fn main() {

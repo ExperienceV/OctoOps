@@ -2,7 +2,6 @@ use sqlx::postgres::PgPoolOptions;
 use sqlx::PgPool;
 
 pub mod config;
-pub mod queries;
 
 use crate::db::config::DbConfig;
 
