@@ -1,6 +1,6 @@
 package collector
 
-import "github.com/ExperienceV/OctoOps/agent/contracts"
+import "github.com/ExperienceV/OctoOps/agent/types"
 
 type Collector struct{}
 
@@ -8,35 +8,35 @@ func New() Collector {
 	return Collector{}
 }
 
-func (Collector) Collect() (contracts.Metrics, error) {
+func (Collector) Collect() (types.Report, error) {
 	cpuPercent, err := CPUPercent()
 	if err != nil {
-		return contracts.Metrics{}, err
+		return nil, err
 	}
 
 	memoryTotal, err := MemoryTotal()
 	if err != nil {
-		return contracts.Metrics{}, err
+		return nil, err
 	}
 
 	memoryUsed, err := MemoryUsed()
 	if err != nil {
-		return contracts.Metrics{}, err
+		return nil, err
 	}
 
 	memoryFree, err := MemoryFree()
 	if err != nil {
-		return contracts.Metrics{}, err
+		return nil, err
 	}
 
-	return contracts.Metrics{
-		CPU: contracts.CpuMetrics{
-			Percent: cpuPercent,
+	return types.Report{
+		"cpu": {
+			"percent": cpuPercent,
 		},
-		Memory: contracts.MemMetrics{
-			Total: memoryTotal,
-			Used:  memoryUsed,
-			Free:  memoryFree,
+		"memory": {
+			"total_bytes": memoryTotal,
+			"used_bytes":  memoryUsed,
+			"free_bytes":  memoryFree,
 		},
 	}, nil
 }

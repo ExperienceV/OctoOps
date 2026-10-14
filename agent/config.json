@@ -1,10 +1,9 @@
 {
-  "token": "super-secret-token",
-  "baseUrl": "https://octoops.com",
+  "baseUrl": "http://127.0.0.1:8000",
   "intervalSeconds": 10,
   "routes": {
     "metrics": {
-      "path": "/metrics",
+      "path": "/servers/agents/report",
       "method": "POST"
     }
   }

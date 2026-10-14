@@ -12,7 +12,6 @@ import (
 )
 
 type Config struct {
-	Token           string `json:"token"`
 	BaseURL         string `json:"baseUrl"`
 	IntervalSeconds int    `json:"intervalSeconds"`
 	Routes          Routes `json:"routes"`
@@ -27,22 +26,32 @@ type Route struct {
 	Method string `json:"method"`
 }
 
-func LoadFromExecutableDir(fileName string) (Config, error) {
-	configPath, err := resolveConfigPath(fileName)
-	if err != nil {
-		return Config{}, err
+// LoadDefault resolves fileName by trying, in order:
+//  1. the current working directory (covers `go run .`)
+//  2. the directory of the executable (covers an installed binary)
+func LoadDefault(fileName string) (Config, error) {
+	for _, dir := range defaultDirs() {
+		path := filepath.Join(dir, fileName)
+		if _, err := os.Stat(path); err == nil {
+			return Load(path)
+		}
 	}
 
-	return Load(configPath)
+	return Config{}, fmt.Errorf("no se encontro %s", fileName)
 }
 
-func resolveConfigPath(fileName string) (string, error) {
-	executablePath, err := os.Executable()
-	if err != nil {
-		return "", fmt.Errorf("no se pudo resolver la ruta del ejecutable: %w", err)
+func defaultDirs() []string {
+	var dirs []string
+
+	if cwd, err := os.Getwd(); err == nil {
+		dirs = append(dirs, cwd)
 	}
 
-	return filepath.Join(filepath.Dir(executablePath), fileName), nil
+	if executablePath, err := os.Executable(); err == nil {
+		dirs = append(dirs, filepath.Dir(executablePath))
+	}
+
+	return dirs
 }
 
 func Load(path string) (Config, error) {
@@ -86,22 +95,13 @@ func (c Config) MetricsMethod() string {
 	return c.Routes.Metrics.Method
 }
 
-func (c Config) TokenHeader() string {
-	return "Bearer " + c.Token
-}
-
 func (c *Config) normalize() {
-	c.Token = strings.TrimSpace(c.Token)
 	c.BaseURL = strings.TrimSpace(c.BaseURL)
 	c.Routes.Metrics.Path = strings.TrimSpace(c.Routes.Metrics.Path)
 	c.Routes.Metrics.Method = strings.ToUpper(strings.TrimSpace(c.Routes.Metrics.Method))
 }
 
 func (c Config) validate() error {
-	if c.Token == "" {
-		return fmt.Errorf("config.json requiere token")
-	}
-
 	if c.BaseURL == "" {
 		return fmt.Errorf("config.json requiere baseUrl")
 	}
