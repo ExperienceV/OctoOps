@@ -2,17 +2,17 @@ use axum::extract::State;
 use axum::http::StatusCode;
 use axum::routing::post;
 use axum::{Json, Router};
-use sqlx::PgPool;
 
+use crate::state::AppState;
 use crate::types::Report;
 
-pub fn router(db: PgPool) -> Router {
+pub fn router(state: AppState) -> Router {
     Router::new()
         .route("/servers/agents/report", post(report))
-        .with_state(db)
+        .with_state(state)
 }
 
-async fn report(State(_db): State<PgPool>, Json(payload): Json<Report>) -> StatusCode {
+async fn report(State(_state): State<AppState>, Json(payload): Json<Report>) -> StatusCode {
     println!(
         "report: {}",
         serde_json::to_string_pretty(&payload).unwrap_or_default()
