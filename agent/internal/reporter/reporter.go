@@ -9,12 +9,12 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/ExperienceV/OctoOps/agent/contracts"
 	"github.com/ExperienceV/OctoOps/agent/internal/config"
+	"github.com/ExperienceV/OctoOps/agent/types"
 )
 
 type MetricsCollector interface {
-	Collect() (contracts.Metrics, error)
+	Collect() (types.Report, error)
 }
 
 type Reporter struct {
@@ -23,8 +23,6 @@ type Reporter struct {
 	endpoint  string
 	method    string
 	interval  time.Duration
-	authToken string
-	token     string
 }
 
 func New(cfg config.Config, collector MetricsCollector) (*Reporter, error) {
@@ -38,11 +36,9 @@ func New(cfg config.Config, collector MetricsCollector) (*Reporter, error) {
 		client: &http.Client{
 			Timeout: 5 * time.Second,
 		},
-		endpoint:  endpoint,
-		method:    cfg.MetricsMethod(),
-		interval:  cfg.MetricsInterval(),
-		authToken: cfg.TokenHeader(),
-		token:     cfg.Token,
+		endpoint: endpoint,
+		method:   cfg.MetricsMethod(),
+		interval: cfg.MetricsInterval(),
 	}, nil
 }
 
@@ -83,8 +79,7 @@ func (r *Reporter) send(ctx context.Context) {
 	}
 
 	request.Header.Set("Content-Type", "application/json")
-	request.Header.Set("Authorization", r.authToken)
-	log.Printf("Sending metrics request token=%s payload=%s", maskToken(r.token), string(body))
+	log.Printf("Sending metrics request payload=%s", string(body))
 
 	response, err := r.client.Do(request)
 	if err != nil {
@@ -98,12 +93,4 @@ func (r *Reporter) send(ctx context.Context) {
 	}
 
 	_, _ = io.Copy(io.Discard, response.Body)
-}
-
-func maskToken(token string) string {
-	if len(token) <= 6 {
-		return token
-	}
-
-	return token[:3] + "........." + token[len(token)-3:]
 }

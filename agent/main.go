@@ -17,7 +17,7 @@ func main() {
 	log.SetFlags(log.Ldate | log.Ltime)
 	log.Println("Started")
 
-	cfg, err := config.LoadFromExecutableDir("config.json")
+	cfg, err := config.LoadDefault("config.json")
 	exitOnError(err)
 
 	service, err := reporter.New(cfg, collector.New())
