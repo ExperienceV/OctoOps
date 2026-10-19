@@ -12,14 +12,17 @@ import (
 )
 
 type Config struct {
-	Token           string `json:"token"`
 	BaseURL         string `json:"baseUrl"`
 	IntervalSeconds int    `json:"intervalSeconds"`
+	ServerID        string `json:"serverId,omitempty"`
+	Token           string `json:"token,omitempty"`
+	Name            string `json:"name,omitempty"`
 	Routes          Routes `json:"routes"`
 }
 
 type Routes struct {
-	Metrics Route `json:"metrics"`
+	Metrics  Route `json:"metrics"`
+	Register Route `json:"register"`
 }
 
 type Route struct {
@@ -27,22 +30,46 @@ type Route struct {
 	Method string `json:"method"`
 }
 
-func LoadFromExecutableDir(fileName string) (Config, error) {
-	configPath, err := resolveConfigPath(fileName)
-	if err != nil {
-		return Config{}, err
+// ResolveConfigPath busca config.json en el directorio de trabajo y en el del
+// ejecutable, y devuelve la ruta encontrada.
+func ResolveConfigPath(fileName string) (string, error) {
+	for _, dir := range defaultDirs() {
+		path := filepath.Join(dir, fileName)
+		if _, err := os.Stat(path); err == nil {
+			return path, nil
+		}
 	}
 
-	return Load(configPath)
+	return "", fmt.Errorf("no se encontro %s", fileName)
 }
 
-func resolveConfigPath(fileName string) (string, error) {
-	executablePath, err := os.Executable()
+// LoadDefault resuelve y carga el config, devolviendo también su ruta.
+func LoadDefault(fileName string) (Config, string, error) {
+	path, err := ResolveConfigPath(fileName)
 	if err != nil {
-		return "", fmt.Errorf("no se pudo resolver la ruta del ejecutable: %w", err)
+		return Config{}, "", err
 	}
 
-	return filepath.Join(filepath.Dir(executablePath), fileName), nil
+	cfg, err := Load(path)
+	if err != nil {
+		return Config{}, "", err
+	}
+
+	return cfg, path, nil
+}
+
+func defaultDirs() []string {
+	var dirs []string
+
+	if cwd, err := os.Getwd(); err == nil {
+		dirs = append(dirs, cwd)
+	}
+
+	if executablePath, err := os.Executable(); err == nil {
+		dirs = append(dirs, filepath.Dir(executablePath))
+	}
+
+	return dirs
 }
 
 func Load(path string) (Config, error) {
@@ -69,10 +96,33 @@ func Load(path string) (Config, error) {
 	return cfg, nil
 }
 
+// Save serializa y escribe el config en la ruta dada.
+func Save(path string, cfg Config) error {
+	data, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return fmt.Errorf("no se pudo serializar config.json: %w", err)
+	}
+
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		return fmt.Errorf("no se pudo escribir %s: %w", path, err)
+	}
+
+	return nil
+}
+
 func (c Config) MetricsEndpoint() (string, error) {
 	endpoint, err := url.JoinPath(c.BaseURL, c.Routes.Metrics.Path)
 	if err != nil {
 		return "", fmt.Errorf("no se pudo construir la URL de metrics: %w", err)
+	}
+
+	return endpoint, nil
+}
+
+func (c Config) RegisterEndpoint() (string, error) {
+	endpoint, err := url.JoinPath(c.BaseURL, c.Routes.Register.Path)
+	if err != nil {
+		return "", fmt.Errorf("no se pudo construir la URL de register: %w", err)
 	}
 
 	return endpoint, nil
@@ -86,22 +136,30 @@ func (c Config) MetricsMethod() string {
 	return c.Routes.Metrics.Method
 }
 
-func (c Config) TokenHeader() string {
-	return "Bearer " + c.Token
+func (c Config) RegisterMethod() string {
+	return c.Routes.Register.Method
 }
 
 func (c *Config) normalize() {
-	c.Token = strings.TrimSpace(c.Token)
 	c.BaseURL = strings.TrimSpace(c.BaseURL)
+	c.ServerID = strings.TrimSpace(c.ServerID)
+	c.Token = strings.TrimSpace(c.Token)
+	c.Name = strings.TrimSpace(c.Name)
+
 	c.Routes.Metrics.Path = strings.TrimSpace(c.Routes.Metrics.Path)
 	c.Routes.Metrics.Method = strings.ToUpper(strings.TrimSpace(c.Routes.Metrics.Method))
+
+	c.Routes.Register.Path = strings.TrimSpace(c.Routes.Register.Path)
+	c.Routes.Register.Method = strings.ToUpper(strings.TrimSpace(c.Routes.Register.Method))
+	if c.Routes.Register.Path == "" {
+		c.Routes.Register.Path = "/servers/agents/register"
+	}
+	if c.Routes.Register.Method == "" {
+		c.Routes.Register.Method = "POST"
+	}
 }
 
 func (c Config) validate() error {
-	if c.Token == "" {
-		return fmt.Errorf("config.json requiere token")
-	}
-
 	if c.BaseURL == "" {
 		return fmt.Errorf("config.json requiere baseUrl")
 	}
