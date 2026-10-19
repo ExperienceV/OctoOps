@@ -90,7 +90,8 @@ fn install_script_content(base_url: &str, token: &str, name: &str) -> String {
         "token": token,
         "name": name,
         "routes": {
-            "metrics": { "path": "/servers/agents/report", "method": "POST" }
+            "metrics": { "path": "/servers/agents/report", "method": "POST" },
+            "register": { "path": "/servers/agents/register", "method": "POST" }
         }
     });
     let config = serde_json::to_string(&config).expect("config json should serialize");

@@ -149,3 +149,36 @@ pub async fn activate_server(
 
     Ok(row.rows_affected() == 1)
 }
+
+/// Devuelve `(public_key, status)` del server, para verificar reportes.
+pub async fn get_server_for_auth(
+    pool: &PgPool,
+    id: Uuid,
+) -> Result<Option<(Option<String>, String)>, sqlx::Error> {
+    sqlx::query_as::<_, (Option<String>, String)>(
+        "SELECT public_key, status FROM servers WHERE id = $1",
+    )
+    .bind(id)
+    .fetch_optional(pool)
+    .await
+}
+
+/// Inserta un reporte de métricas y actualiza `last_seen_at`.
+pub async fn insert_metric(
+    pool: &PgPool,
+    server_id: Uuid,
+    metrics_json: &str,
+) -> Result<(), sqlx::Error> {
+    sqlx::query("INSERT INTO metrics (server_id, metrics) VALUES ($1, $2::jsonb)")
+        .bind(server_id)
+        .bind(metrics_json)
+        .execute(pool)
+        .await?;
+
+    sqlx::query("UPDATE servers SET last_seen_at = now() WHERE id = $1")
+        .bind(server_id)
+        .execute(pool)
+        .await?;
+
+    Ok(())
+}
