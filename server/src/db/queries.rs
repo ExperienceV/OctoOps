@@ -77,3 +77,75 @@ pub async fn get_user(pool: &PgPool, id: Uuid) -> Result<Option<User>, sqlx::Err
         avatar_url,
     }))
 }
+
+pub async fn create_server(
+    pool: &PgPool,
+    user_id: Uuid,
+    name: &str,
+    token_hash: &str,
+    ttl_secs: i64,
+) -> Result<Uuid, sqlx::Error> {
+    let id = Uuid::new_v4();
+    sqlx::query(
+        r#"
+        INSERT INTO servers (id, user_id, name, status, enrollment_token_hash, enrollment_expires_at)
+        VALUES ($1, $2, $3, 'pending', $4, now() + make_interval(secs => $5))
+        "#,
+    )
+    .bind(id)
+    .bind(user_id)
+    .bind(name)
+    .bind(token_hash)
+    .bind(ttl_secs as f64)
+    .execute(pool)
+    .await?;
+
+    Ok(id)
+}
+
+pub struct PendingServer {
+    pub id: Uuid,
+    pub name: String,
+}
+
+pub async fn get_pending_server_by_token_hash(
+    pool: &PgPool,
+    token_hash: &str,
+) -> Result<Option<PendingServer>, sqlx::Error> {
+    let row = sqlx::query_as::<_, (Uuid, String)>(
+        r#"
+        SELECT id, name FROM servers
+        WHERE enrollment_token_hash = $1
+          AND status = 'pending'
+          AND enrollment_expires_at > now()
+        "#,
+    )
+    .bind(token_hash)
+    .fetch_optional(pool)
+    .await?;
+
+    Ok(row.map(|(id, name)| PendingServer { id, name }))
+}
+
+pub async fn activate_server(
+    pool: &PgPool,
+    id: Uuid,
+    public_key: &str,
+) -> Result<bool, sqlx::Error> {
+    let row = sqlx::query(
+        r#"
+        UPDATE servers
+        SET status = 'active',
+            public_key = $2,
+            enrollment_token_hash = NULL,
+            enrollment_expires_at = NULL
+        WHERE id = $1 AND status = 'pending'
+        "#,
+    )
+    .bind(id)
+    .bind(public_key)
+    .execute(pool)
+    .await?;
+
+    Ok(row.rows_affected() == 1)
+}

@@ -11,11 +11,15 @@ CREATE TABLE users (
 );
 
 CREATE TABLE servers (
-  id         uuid PRIMARY KEY,
-  user_id    uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  name       text NOT NULL,
-  public_key text NOT NULL,
-  created_at timestamptz NOT NULL DEFAULT now()
+  id                     uuid PRIMARY KEY,
+  user_id                uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name                   text NOT NULL,
+  public_key             text,
+  status                 text NOT NULL DEFAULT 'pending',
+  enrollment_token_hash  text,
+  enrollment_expires_at  timestamptz,
+  last_seen_at           timestamptz,
+  created_at             timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX ON servers(user_id);
 

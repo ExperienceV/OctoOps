@@ -5,6 +5,8 @@ pub struct Config {
     pub github_callback_url: String,
     pub jwt_secret: String,
     pub frontend_url: String,
+    pub base_url: String,
+    pub agent_binary_path: String,
 }
 
 impl Config {
@@ -19,6 +21,11 @@ impl Config {
             // En producción este valor debe venir del entorno, nunca usar el default.
             jwt_secret: env_or("JWT_SECRET", "dev-secret"),
             frontend_url: env_or("FRONTEND_URL", "http://localhost:5173"),
+            base_url: env_or("BASE_URL", "http://127.0.0.1:8000"),
+            agent_binary_path: env_or(
+                "AGENT_BINARY_PATH",
+                "../agent/installer/agent-v0.1.0-beta-linux-amd64",
+            ),
         }
     }
 }

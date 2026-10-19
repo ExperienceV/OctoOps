@@ -1,5 +1,6 @@
 pub mod auth;
 pub mod report;
+pub mod servers;
 
 use axum::Router;
 
@@ -11,4 +12,5 @@ pub fn router(state: AppState) -> Router {
     Router::new()
         .merge(report::router(state.clone()))
         .merge(auth::router(state.clone()))
+        .merge(servers::router(state.clone()))
 }

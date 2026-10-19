@@ -953,10 +953,13 @@ version = "0.1.0-beta"
 dependencies = [
  "axum",
  "dotenvy",
+ "hex",
  "jsonwebtoken",
+ "rand 0.8.8",
  "reqwest",
  "serde",
  "serde_json",
+ "sha2",
  "sqlx",
  "tokio",
  "url",
