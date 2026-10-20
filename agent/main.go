@@ -53,7 +53,7 @@ func register(cfg config.Config, cfgPath string) (config.Config, string, error) 
 	}
 
 	registerPath := cfg.Routes.Register.Path
-	serverID, err := enroll.Register(cfg.BaseURL, registerPath, cfg.Token, cfg.Name, keypair.PublicKeyHex)
+	serverID, err := enroll.Register(cfg.BaseURL, registerPath, cfg.Token, cfg.Name, keypair.PublicKeyHex, cfg.IntervalSeconds)
 	if err != nil {
 		return cfg, cfgPath, err
 	}

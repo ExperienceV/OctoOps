@@ -18,6 +18,7 @@ CREATE TABLE servers (
   status                 text NOT NULL DEFAULT 'pending',
   enrollment_token_hash  text,
   enrollment_expires_at  timestamptz,
+  interval_seconds       integer,
   last_seen_at           timestamptz,
   created_at             timestamptz NOT NULL DEFAULT now()
 );

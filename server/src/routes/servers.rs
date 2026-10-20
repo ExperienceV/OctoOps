@@ -1,9 +1,10 @@
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::http::header::{HeaderMap, HeaderValue};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -12,13 +13,132 @@ use crate::db;
 use crate::enrollment;
 use crate::state::AppState;
 
+/// Factor de gracia para marcar un servidor como `offline`:
+/// `now - last_seen > interval * 3`.
+const OFFLINE_GRACE_FACTOR: i64 = 3;
+
 pub fn router(state: AppState) -> Router {
     Router::new()
-        .route("/servers", post(create_server))
+        .route("/servers", get(list_servers).post(create_server))
         .route("/servers/install/bin", get(install_bin))
         .route("/servers/install/{token}", get(install_script))
         .route("/servers/agents/register", post(register))
+        .route("/servers/{id}", get(get_server))
+        .route("/servers/{id}/metrics", get(list_metrics))
         .with_state(state)
+}
+
+#[derive(Serialize)]
+struct ServerView {
+    id: Uuid,
+    name: String,
+    status: &'static str,
+    interval_seconds: Option<i32>,
+    last_seen_at: Option<DateTime<Utc>>,
+    created_at: DateTime<Utc>,
+}
+
+#[derive(Serialize)]
+struct MetricView {
+    recorded_at: DateTime<Utc>,
+    metrics: serde_json::Value,
+}
+
+fn server_status(interval_seconds: Option<i32>, last_seen_at: Option<DateTime<Utc>>) -> &'static str {
+    match last_seen_at {
+        None => "unreported",
+        Some(seen) => {
+            let interval = interval_seconds.unwrap_or(10).max(1) as i64;
+            let grace = chrono::Duration::seconds(interval * OFFLINE_GRACE_FACTOR);
+            if Utc::now() - seen <= grace {
+                "online"
+            } else {
+                "offline"
+            }
+        }
+    }
+}
+
+fn into_view(row: db::queries::ServerRow) -> ServerView {
+    ServerView {
+        id: row.id,
+        name: row.name,
+        status: server_status(row.interval_seconds, row.last_seen_at),
+        interval_seconds: row.interval_seconds,
+        last_seen_at: row.last_seen_at,
+        created_at: row.created_at,
+    }
+}
+
+async fn list_servers(State(state): State<AppState>, headers: HeaderMap) -> Response {
+    let Some(user_id) = cookies::current_user_id(&headers, &state.config.jwt_secret) else {
+        return (StatusCode::UNAUTHORIZED, "not authenticated").into_response();
+    };
+
+    match db::queries::list_servers(&state.pool, user_id).await {
+        Ok(servers) => {
+            let views: Vec<ServerView> = servers.into_iter().map(into_view).collect();
+            Json(views).into_response()
+        }
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "db error").into_response(),
+    }
+}
+
+async fn get_server(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<Uuid>,
+) -> Response {
+    let Some(user_id) = cookies::current_user_id(&headers, &state.config.jwt_secret) else {
+        return (StatusCode::UNAUTHORIZED, "not authenticated").into_response();
+    };
+
+    match db::queries::get_server(&state.pool, user_id, id).await {
+        Ok(Some(server)) => Json(into_view(server)).into_response(),
+        Ok(None) => (StatusCode::NOT_FOUND, "server not found").into_response(),
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "db error").into_response(),
+    }
+}
+
+#[derive(Deserialize)]
+struct MetricsParams {
+    limit: Option<i64>,
+}
+
+async fn list_metrics(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<Uuid>,
+    Query(params): Query<MetricsParams>,
+) -> Response {
+    let Some(user_id) = cookies::current_user_id(&headers, &state.config.jwt_secret) else {
+        return (StatusCode::UNAUTHORIZED, "not authenticated").into_response();
+    };
+
+    let owned = match db::queries::get_server(&state.pool, user_id, id).await {
+        Ok(Some(_)) => true,
+        Ok(None) => return (StatusCode::NOT_FOUND, "server not found").into_response(),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, "db error").into_response(),
+    };
+    if !owned {
+        return (StatusCode::NOT_FOUND, "server not found").into_response();
+    }
+
+    let limit = params.limit.unwrap_or(100).clamp(1, 1000);
+
+    match db::queries::list_metrics(&state.pool, id, limit).await {
+        Ok(metrics) => {
+            let views: Vec<MetricView> = metrics
+                .into_iter()
+                .map(|m| MetricView {
+                    recorded_at: m.recorded_at,
+                    metrics: m.metrics,
+                })
+                .collect();
+            Json(views).into_response()
+        }
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "db error").into_response(),
+    }
 }
 
 #[derive(Deserialize)]
@@ -135,6 +255,7 @@ async fn install_bin(State(state): State<AppState>) -> Response {
 struct RegisterBody {
     token: String,
     public_key: String,
+    interval_seconds: Option<i32>,
 }
 
 #[derive(Serialize)]
@@ -156,7 +277,10 @@ async fn register(State(state): State<AppState>, Json(body): Json<RegisterBody>)
         Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, "db error").into_response(),
     };
 
-    match db::queries::activate_server(&state.pool, server.id, &body.public_key).await {
+    let interval_seconds = body.interval_seconds.unwrap_or(10).max(1);
+
+    match db::queries::activate_server(&state.pool, server.id, &body.public_key, interval_seconds).await
+    {
         Ok(true) => Json(RegisterResponse { server_id: server.id }).into_response(),
         Ok(false) => (StatusCode::CONFLICT, "server already registered").into_response(),
         Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "db error").into_response(),

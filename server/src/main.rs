@@ -22,11 +22,12 @@ async fn main() {
 
     let app = routes::router(state);
 
-    let listener = tokio::net::TcpListener::bind(routes::ADDR)
+    let addr = std::env::var("ADDR").unwrap_or_else(|_| routes::ADDR.to_string());
+    let listener = tokio::net::TcpListener::bind(&addr)
         .await
-        .unwrap_or_else(|e| panic!("failed to bind {}: {e}", routes::ADDR));
+        .unwrap_or_else(|e| panic!("failed to bind {}: {e}", addr));
 
-    println!("OctoOps backend listening on http://{}", routes::ADDR);
+    println!("OctoOps backend listening on http://{addr}");
 
     axum::serve(listener, app)
         .await

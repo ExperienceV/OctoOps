@@ -1,0 +1,7 @@
+.git
+**/target
+agent/installer
+local
+node_modules
+docs
+*.md
