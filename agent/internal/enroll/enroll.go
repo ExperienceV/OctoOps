@@ -33,12 +33,18 @@ func GenerateKeypair() (Keypair, error) {
 	}, nil
 }
 
-// Register envía el token + nombre + llave pública al server y devuelve el server ID.
-func Register(baseURL, registerPath, token, name, publicKeyHex string) (string, error) {
-	payload := map[string]string{
-		"token":      token,
-		"name":       name,
-		"public_key": publicKeyHex,
+// Register envía el token + nombre + llave pública + intervalo al server y devuelve el server ID.
+func Register(baseURL, registerPath, token, name, publicKeyHex string, intervalSeconds int) (string, error) {
+	payload := struct {
+		Token           string `json:"token"`
+		Name            string `json:"name"`
+		PublicKey       string `json:"public_key"`
+		IntervalSeconds int    `json:"interval_seconds"`
+	}{
+		Token:           token,
+		Name:            name,
+		PublicKey:       publicKeyHex,
+		IntervalSeconds: intervalSeconds,
 	}
 
 	body, err := json.Marshal(payload)

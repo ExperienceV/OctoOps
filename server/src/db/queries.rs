@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use sqlx::PgPool;
 use uuid::Uuid;
 
@@ -131,12 +132,14 @@ pub async fn activate_server(
     pool: &PgPool,
     id: Uuid,
     public_key: &str,
+    interval_seconds: i32,
 ) -> Result<bool, sqlx::Error> {
     let row = sqlx::query(
         r#"
         UPDATE servers
         SET status = 'active',
             public_key = $2,
+            interval_seconds = $3,
             enrollment_token_hash = NULL,
             enrollment_expires_at = NULL
         WHERE id = $1 AND status = 'pending'
@@ -144,6 +147,7 @@ pub async fn activate_server(
     )
     .bind(id)
     .bind(public_key)
+    .bind(interval_seconds)
     .execute(pool)
     .await?;
 
@@ -181,4 +185,83 @@ pub async fn insert_metric(
         .await?;
 
     Ok(())
+}
+
+pub struct ServerRow {
+    pub id: Uuid,
+    pub name: String,
+    pub interval_seconds: Option<i32>,
+    pub last_seen_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+}
+
+pub async fn list_servers(pool: &PgPool, user_id: Uuid) -> Result<Vec<ServerRow>, sqlx::Error> {
+    let rows = sqlx::query_as::<_, (Uuid, String, Option<i32>, Option<DateTime<Utc>>, DateTime<Utc>)>(
+        "SELECT id, name, interval_seconds, last_seen_at, created_at \
+         FROM servers WHERE user_id = $1 AND status = 'active' ORDER BY created_at DESC",
+    )
+    .bind(user_id)
+    .fetch_all(pool)
+    .await?;
+
+    Ok(rows
+        .into_iter()
+        .map(|(id, name, interval_seconds, last_seen_at, created_at)| ServerRow {
+            id,
+            name,
+            interval_seconds,
+            last_seen_at,
+            created_at,
+        })
+        .collect())
+}
+
+pub async fn get_server(
+    pool: &PgPool,
+    user_id: Uuid,
+    id: Uuid,
+) -> Result<Option<ServerRow>, sqlx::Error> {
+    let row = sqlx::query_as::<_, (Uuid, String, Option<i32>, Option<DateTime<Utc>>, DateTime<Utc>)>(
+        "SELECT id, name, interval_seconds, last_seen_at, created_at \
+         FROM servers WHERE id = $1 AND user_id = $2 AND status = 'active'",
+    )
+    .bind(id)
+    .bind(user_id)
+    .fetch_optional(pool)
+    .await?;
+
+    Ok(row.map(
+        |(id, name, interval_seconds, last_seen_at, created_at)| ServerRow {
+            id,
+            name,
+            interval_seconds,
+            last_seen_at,
+            created_at,
+        },
+    ))
+}
+
+pub struct MetricRow {
+    pub recorded_at: DateTime<Utc>,
+    pub metrics: serde_json::Value,
+}
+
+pub async fn list_metrics(
+    pool: &PgPool,
+    server_id: Uuid,
+    limit: i64,
+) -> Result<Vec<MetricRow>, sqlx::Error> {
+    let rows = sqlx::query_as::<_, (DateTime<Utc>, serde_json::Value)>(
+        "SELECT recorded_at, metrics FROM metrics \
+         WHERE server_id = $1 ORDER BY recorded_at DESC LIMIT $2",
+    )
+    .bind(server_id)
+    .bind(limit)
+    .fetch_all(pool)
+    .await?;
+
+    Ok(rows
+        .into_iter()
+        .map(|(recorded_at, metrics)| MetricRow { recorded_at, metrics })
+        .collect())
 }
