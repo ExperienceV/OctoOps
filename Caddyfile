@@ -1,0 +1,3 @@
+octoops.apeiriumx.com {
+	reverse_proxy server:8000
+}
