@@ -3,13 +3,17 @@ octoops.apeiriumx.com {
 	handle /auth/* {
 		reverse_proxy server:8000
 	}
+	handle /servers {
+		reverse_proxy server:8000
+	}
 	handle /servers/* {
 		reverse_proxy server:8000
 	}
 
-	# Todo lo demás → cliente estático
+	# Todo lo demás → cliente estático (SPA)
 	handle {
 		root * /srv/client
+		try_files {path} /index.html
 		file_server
 	}
 }
