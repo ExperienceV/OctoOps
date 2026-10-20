@@ -17,6 +17,33 @@ use crate::state::AppState;
 /// `now - last_seen > interval * 3`.
 const OFFLINE_GRACE_FACTOR: i64 = 3;
 
+/// Script de control del agente (start/stop/restart/status), que se instala
+/// junto con el binario.
+const AGENT_CTL: &str = r#"#!/bin/sh
+DIR="$(cd "$(dirname "$0")" && pwd)"
+BIN="$DIR/octo-agent"
+PID="$DIR/octo-agent.pid"
+LOG="$DIR/octo-agent.log"
+is_running() { [ -f "$PID" ] && kill -0 "$(cat "$PID")" 2>/dev/null; }
+start() {
+  if is_running; then echo "ya está corriendo (pid $(cat "$PID"))"; return 0; fi
+  nohup "$BIN" >>"$LOG" 2>&1 &
+  echo $! > "$PID"
+  echo "iniciado (pid $(cat "$PID"))"
+}
+stop() {
+  if is_running; then kill "$(cat "$PID")" 2>/dev/null; rm -f "$PID"; echo "detenido"; else rm -f "$PID"; echo "no estaba corriendo"; fi
+}
+restart() { "$0" stop; sleep 1; "$0" start; }
+status() {
+  if is_running; then echo "corriendo (pid $(cat "$PID"))"; else echo "detenido"; fi
+}
+case "${1:-}" in
+  start) start ;; stop) stop ;; restart) restart ;; status) status ;;
+  *) echo "uso: $0 {start|stop|restart|status}"; exit 1 ;;
+esac
+"#;
+
 pub fn router(state: AppState) -> Router {
     Router::new()
         .route("/servers", get(list_servers).post(create_server))
@@ -231,9 +258,15 @@ fn install_script_content(base_url: &str, token: &str, name: &str) -> String {
          {config}\n\
          EOF\n\
          \n\
-         echo 'Instalado en OctoAgent/. Ejecuta: ./OctoAgent/octo-agent'\n",
+         cat > octo-agent-ctl <<'OCTOCTL'\n\
+         {ctl}\n\
+         OCTOCTL\n\
+         chmod +x octo-agent-ctl\n\
+         \n\
+         echo 'Instalado. Ejecuta: cd OctoAgent && ./octo-agent-ctl start'\n",
         base_url = base_url,
         config = config,
+        ctl = AGENT_CTL,
     )
 }
 
