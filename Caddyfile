@@ -1,3 +1,15 @@
 octoops.apeiriumx.com {
-	reverse_proxy server:8000
+	# API → backend
+	handle /auth/* {
+		reverse_proxy server:8000
+	}
+	handle /servers/* {
+		reverse_proxy server:8000
+	}
+
+	# Todo lo demás → cliente estático
+	handle {
+		root * /srv/client
+		file_server
+	}
 }
