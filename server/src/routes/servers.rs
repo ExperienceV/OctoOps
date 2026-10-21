@@ -59,6 +59,7 @@ pub fn router(state: AppState) -> Router {
 struct ServerView {
     id: Uuid,
     name: String,
+    kind: String,
     status: &'static str,
     interval_seconds: Option<i32>,
     last_seen_at: Option<DateTime<Utc>>,
@@ -90,6 +91,7 @@ fn into_view(row: db::queries::ServerRow) -> ServerView {
     ServerView {
         id: row.id,
         name: row.name,
+        kind: row.kind,
         status: server_status(row.interval_seconds, row.last_seen_at),
         interval_seconds: row.interval_seconds,
         last_seen_at: row.last_seen_at,
@@ -171,11 +173,8 @@ async fn list_metrics(
 #[derive(Deserialize)]
 struct CreateServerBody {
     name: String,
-}
-
-#[derive(Serialize)]
-struct CreateServerResponse {
-    install_command: String,
+    kind: Option<String>,
+    interval_seconds: Option<i32>,
 }
 
 async fn create_server(
@@ -195,20 +194,32 @@ async fn create_server(
     let token = enrollment::generate();
     let token_hash = enrollment::hash(&token);
 
-    if let Err(_) = db::queries::create_server(
-        &state.pool,
-        user_id,
-        name,
-        &token_hash,
-        enrollment::TTL_SECS,
-    )
-    .await
-    {
-        return (StatusCode::INTERNAL_SERVER_ERROR, "db error").into_response();
+    if body.kind.as_deref() == Some("device") {
+        // Dispositivo IoT: se crea activo con su token persistente.
+        let interval = body.interval_seconds.unwrap_or(300).max(1);
+        if let Err(_) =
+            db::queries::create_device(&state.pool, user_id, name, &token_hash, interval).await
+        {
+            return (StatusCode::INTERNAL_SERVER_ERROR, "db error").into_response();
+        }
+        Json(serde_json::json!({ "token": token })).into_response()
+    } else {
+        // Servidor: pendiente + token de enrollment.
+        if let Err(_) = db::queries::create_server(
+            &state.pool,
+            user_id,
+            name,
+            &token_hash,
+            enrollment::TTL_SECS,
+        )
+        .await
+        {
+            return (StatusCode::INTERNAL_SERVER_ERROR, "db error").into_response();
+        }
+        let install_command =
+            format!("curl -fsSL {}/servers/install/{} | sh", state.config.base_url, token);
+        Json(serde_json::json!({ "install_command": install_command })).into_response()
     }
-
-    let install_command = format!("curl -fsSL {}/servers/install/{} | sh", state.config.base_url, token);
-    Json(CreateServerResponse { install_command }).into_response()
 }
 
 async fn install_script(State(state): State<AppState>, Path(token): Path<String>) -> Response {

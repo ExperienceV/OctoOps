@@ -82,6 +82,18 @@ DOMAIN_URL = https://octoops.apeiriumx.com
 
 El dashboard lista los servidores y consulta sus métricas (endpoints 5.x).
 
+### 2.7 Dispositivo IoT (token)
+
+1. `POST /servers` con `{ "name": "Incubadora", "kind": "device", "interval_seconds": 300 }`
+   → devuelve un **token** (se muestra una vez).
+2. El token se flashea en el firmware del ESP32.
+3. El ESP32 reporta cada N segundos:
+   `POST /servers/agents/report` con `Authorization: Bearer <token>` y el JSON de métricas.
+4. El backend hace hash del token, identifica el device y persiste.
+
+> Los devices se crean **activos** (sin paso de registro). Más detalle en
+> [`docs/iot-devices.md`](iot-devices.md).
+
 ---
 
 ## 3. Autenticación
@@ -91,6 +103,7 @@ El dashboard lista los servidores y consulta sus métricas (endpoints 5.x).
 | **GitHub OAuth + JWT (cookies)** | Usuario (dashboard web) | Cookies `httpOnly`, `SameSite=Lax`, `Path=/` |
 | **Token de enrollment** | Agente (solo registro) | Token aleatorio de un solo uso, hash en DB |
 | **Firma Ed25519** | Agente (reportes) | Firma `timestamp + "\n" + body` |
+| **Token (Bearer)** | Dispositivo IoT (reportes) | `Authorization: Bearer <token>` persistente |
 
 **Cookies:**
 
@@ -132,18 +145,21 @@ Ejemplo:
 { "id": "uuid", "username": "octocat", "email": "a@b.com", "avatar_url": "https://…" }
 ```
 
-### 4.3 Servidor
+### 4.3 Servidor / Dispositivo
 
 ```json
 {
   "id": "uuid",
   "name": "mi-vps",
+  "kind": "server",
   "status": "online",
   "interval_seconds": 10,
   "last_seen_at": "2026-10-20T03:36:14Z",
   "created_at": "2026-10-20T03:36:14Z"
 }
 ```
+
+- `kind`: `"server"` (agente Go) o `"device"` (IoT, ej. ESP32).
 
 `status`:
 
@@ -177,9 +193,9 @@ Ejemplo:
 
 | Método | Ruta | Auth | Descripción |
 |---|---|---|---|
-| `GET` | `/servers` | JWT | Lista los servidores del usuario. |
-| `POST` | `/servers` | JWT | Crea un server + token de enrollment. |
-| `GET` | `/servers/:id` | JWT | Detalle de un servidor. |
+| `GET` | `/servers` | JWT | Lista los servidores/dispositivos del usuario. |
+| `POST` | `/servers` | JWT | Crea un server (install command) o un device (token). |
+| `GET` | `/servers/:id` | JWT | Detalle de un servidor/dispositivo. |
 | `GET` | `/servers/:id/metrics` | JWT | Historial de métricas. |
 | `GET` | `/servers/install/:token` | token | Script de instalación. |
 | `GET` | `/servers/install/bin` | público | Binario del agente. |
@@ -189,7 +205,7 @@ Ejemplo:
 
 | Método | Ruta | Auth | Descripción |
 |---|---|---|---|
-| `POST` | `/servers/agents/report` | firma Ed25519 | Recibe y persiste métricas. |
+| `POST` | `/servers/agents/report` | Ed25519 (server) o token (device) | Recibe y persiste métricas. |
 
 ---
 
@@ -221,6 +237,7 @@ Ejemplo:
   {
     "id": "uuid",
     "name": "mi-vps",
+    "kind": "server",
     "status": "online",
     "interval_seconds": 10,
     "last_seen_at": "2026-10-20T03:36:14Z",
@@ -234,14 +251,25 @@ Ejemplo:
 Body:
 
 ```json
-{ "name": "mi-vps" }
+{ "name": "mi-vps", "kind": "server", "interval_seconds": 10 }
 ```
 
-→ `200`:
+- `kind`: `"server"` (default) o `"device"`.
+- `interval_seconds`: default `10` (server) o `300` (device).
+
+**Server** → `200`:
 
 ```json
 { "install_command": "curl -fsSL https://octoops.apeiriumx.com/servers/install/<token> | sh" }
 ```
+
+**Device** → `200`:
+
+```json
+{ "token": "ee360603ab6c…" }
+```
+
+> El token del device se muestra una sola vez y se guarda hasheado (SHA-256).
 
 ### `GET /servers/:id`
 → `200` (misma forma que un elemento de la lista). `404` si no existe/no es tuyo.
@@ -282,7 +310,9 @@ Body:
 
 ### `POST /servers/agents/report`
 
-Headers:
+Acepta dos auths:
+
+**Server (Ed25519)** — headers:
 
 | Header | Valor |
 |---|---|
@@ -290,10 +320,16 @@ Headers:
 | `X-Timestamp` | Unix seconds |
 | `X-Signature` | firma Ed25519 en hex |
 
+**Device (token)** — header:
+
+| Header | Valor |
+|---|---|
+| `Authorization` | `Bearer <token>` |
+
 Body: un reporte (contrato 4.1).
 
 → `204` reporte recibido y persistido. `400` headers/payload inválidos ·
-`401` firma inválida / timestamp viejo / agente desconocido.
+`401` firma/token inválidos, timestamp viejo, o agente/dispositivo desconocido.
 
 ---
 

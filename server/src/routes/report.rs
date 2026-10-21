@@ -7,6 +7,7 @@ use axum::Router;
 use uuid::Uuid;
 
 use crate::db;
+use crate::enrollment;
 use crate::state::AppState;
 use crate::types::Report;
 
@@ -19,6 +20,12 @@ pub fn router(state: AppState) -> Router {
 }
 
 async fn report(State(state): State<AppState>, headers: HeaderMap, body: Bytes) -> Response {
+    // Auth por token (dispositivos IoT): Authorization: Bearer <token>
+    if let Some(token) = bearer_token(&headers) {
+        return report_with_token(&state, token, &body).await;
+    }
+
+    // Auth por Ed25519 (servidores)
     let Some(agent_id) = header_str(&headers, "x-agent-id") else {
         return (StatusCode::BAD_REQUEST, "missing X-Agent-ID").into_response();
     };
@@ -80,6 +87,39 @@ async fn report(State(state): State<AppState>, headers: HeaderMap, body: Bytes) 
     }
 
     let metrics_json = String::from_utf8_lossy(&body).to_string();
+    if db::queries::insert_metric(&state.pool, server_id, &metrics_json)
+        .await
+        .is_err()
+    {
+        return (StatusCode::INTERNAL_SERVER_ERROR, "db error").into_response();
+    }
+
+    StatusCode::NO_CONTENT.into_response()
+}
+
+fn bearer_token(headers: &HeaderMap) -> Option<&str> {
+    headers
+        .get("authorization")?
+        .to_str()
+        .ok()?
+        .strip_prefix("Bearer ")
+        .map(str::trim)
+}
+
+async fn report_with_token(state: &AppState, token: &str, body: &Bytes) -> Response {
+    let token_hash = enrollment::hash(token);
+
+    let server_id = match db::queries::get_device_by_token_hash(&state.pool, &token_hash).await {
+        Ok(Some(id)) => id,
+        Ok(None) => return (StatusCode::UNAUTHORIZED, "invalid token").into_response(),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, "db error").into_response(),
+    };
+
+    if serde_json::from_slice::<Report>(body.as_ref()).is_err() {
+        return (StatusCode::BAD_REQUEST, "invalid report payload").into_response();
+    }
+
+    let metrics_json = String::from_utf8_lossy(body).to_string();
     if db::queries::insert_metric(&state.pool, server_id, &metrics_json)
         .await
         .is_err()

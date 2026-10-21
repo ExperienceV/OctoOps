@@ -136,5 +136,6 @@ build → GHCR → SSH deploy).
 
 - [`contracts/report.md`](contracts/report.md) — metrics payload:
   `{ "category": { "subcategory": number | bool } }`.
+- [`contracts/server.md`](contracts/server.md) — server/device node shape (`kind`, `status`, …).
 - [`docs/guide.md`](docs/guide.md) — server, user and metric contracts, statuses and response
   codes.

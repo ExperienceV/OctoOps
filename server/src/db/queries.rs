@@ -104,6 +104,32 @@ pub async fn create_server(
     Ok(id)
 }
 
+/// Crea un dispositivo IoT activo con su token persistente (hash guardado).
+pub async fn create_device(
+    pool: &PgPool,
+    user_id: Uuid,
+    name: &str,
+    token_hash: &str,
+    interval_seconds: i32,
+) -> Result<Uuid, sqlx::Error> {
+    let id = Uuid::new_v4();
+    sqlx::query(
+        r#"
+        INSERT INTO servers (id, user_id, name, kind, status, token_hash, interval_seconds)
+        VALUES ($1, $2, $3, 'device', 'active', $4, $5)
+        "#,
+    )
+    .bind(id)
+    .bind(user_id)
+    .bind(name)
+    .bind(token_hash)
+    .bind(interval_seconds)
+    .execute(pool)
+    .await?;
+
+    Ok(id)
+}
+
 pub struct PendingServer {
     pub id: Uuid,
     pub name: String,
@@ -167,6 +193,21 @@ pub async fn get_server_for_auth(
     .await
 }
 
+/// Busca un dispositivo activo por el hash de su token (auth de IoT).
+pub async fn get_device_by_token_hash(
+    pool: &PgPool,
+    token_hash: &str,
+) -> Result<Option<Uuid>, sqlx::Error> {
+    let row = sqlx::query_as::<_, (Uuid,)>(
+        "SELECT id FROM servers WHERE token_hash = $1 AND kind = 'device' AND status = 'active'",
+    )
+    .bind(token_hash)
+    .fetch_optional(pool)
+    .await?;
+
+    Ok(row.map(|(id,)| id))
+}
+
 /// Inserta un reporte de métricas y actualiza `last_seen_at`.
 pub async fn insert_metric(
     pool: &PgPool,
@@ -190,14 +231,15 @@ pub async fn insert_metric(
 pub struct ServerRow {
     pub id: Uuid,
     pub name: String,
+    pub kind: String,
     pub interval_seconds: Option<i32>,
     pub last_seen_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
 }
 
 pub async fn list_servers(pool: &PgPool, user_id: Uuid) -> Result<Vec<ServerRow>, sqlx::Error> {
-    let rows = sqlx::query_as::<_, (Uuid, String, Option<i32>, Option<DateTime<Utc>>, DateTime<Utc>)>(
-        "SELECT id, name, interval_seconds, last_seen_at, created_at \
+    let rows = sqlx::query_as::<_, (Uuid, String, String, Option<i32>, Option<DateTime<Utc>>, DateTime<Utc>)>(
+        "SELECT id, name, kind, interval_seconds, last_seen_at, created_at \
          FROM servers WHERE user_id = $1 AND status = 'active' ORDER BY created_at DESC",
     )
     .bind(user_id)
@@ -206,9 +248,10 @@ pub async fn list_servers(pool: &PgPool, user_id: Uuid) -> Result<Vec<ServerRow>
 
     Ok(rows
         .into_iter()
-        .map(|(id, name, interval_seconds, last_seen_at, created_at)| ServerRow {
+        .map(|(id, name, kind, interval_seconds, last_seen_at, created_at)| ServerRow {
             id,
             name,
+            kind,
             interval_seconds,
             last_seen_at,
             created_at,
@@ -221,8 +264,8 @@ pub async fn get_server(
     user_id: Uuid,
     id: Uuid,
 ) -> Result<Option<ServerRow>, sqlx::Error> {
-    let row = sqlx::query_as::<_, (Uuid, String, Option<i32>, Option<DateTime<Utc>>, DateTime<Utc>)>(
-        "SELECT id, name, interval_seconds, last_seen_at, created_at \
+    let row = sqlx::query_as::<_, (Uuid, String, String, Option<i32>, Option<DateTime<Utc>>, DateTime<Utc>)>(
+        "SELECT id, name, kind, interval_seconds, last_seen_at, created_at \
          FROM servers WHERE id = $1 AND user_id = $2 AND status = 'active'",
     )
     .bind(id)
@@ -231,9 +274,10 @@ pub async fn get_server(
     .await?;
 
     Ok(row.map(
-        |(id, name, interval_seconds, last_seen_at, created_at)| ServerRow {
+        |(id, name, kind, interval_seconds, last_seen_at, created_at)| ServerRow {
             id,
             name,
+            kind,
             interval_seconds,
             last_seen_at,
             created_at,
