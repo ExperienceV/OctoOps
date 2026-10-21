@@ -15,6 +15,10 @@ async fn main() {
         .await
         .unwrap_or_else(|e| panic!("failed to connect to database: {e}"));
 
+    db::migrate(&pool)
+        .await
+        .unwrap_or_else(|e| panic!("failed to run migrations: {e}"));
+
     let state = AppState {
         pool,
         config: auth::Config::from_env(),
