@@ -1,7 +1,8 @@
 # Contract of metric reports (JSONB)
 
-Defines the shape of the `metrics` payload that agents (and any future device) send to the server: 
-metrics grouped by category, each mapping to a numeric or boolean value.
+Defines the shape of the `metrics` payload that **servers** (via the Go agent) and
+**IoT devices** (ESP32, etc.) send to the backend: metrics grouped by category, each
+mapping to a numeric or boolean value.
 
 ```text
 report = {
@@ -11,7 +12,7 @@ report = {
 }
 ```
 
-## Example
+## Example (server)
 
 ```json
 {
@@ -19,5 +20,15 @@ report = {
   "memory": { "total_mb": 7900, "used_mb": 3100, "free_mb": 4800 },
   "disk":   { "total_gb": 80, "used_gb": 31 },
   "service":{ "running": true }
+}
+```
+
+## Example (IoT device)
+
+```json
+{
+  "temperatura": { "celsius": 23.5 },
+  "humedad":     { "porcentaje": 60 },
+  "bateria":     { "volts": 3.7 }
 }
 ```

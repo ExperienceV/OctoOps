@@ -14,11 +14,13 @@ CREATE TABLE servers (
   id                     uuid PRIMARY KEY,
   user_id                uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   name                   text NOT NULL,
+  kind                   text NOT NULL DEFAULT 'server',
   public_key             text,
   status                 text NOT NULL DEFAULT 'pending',
   enrollment_token_hash  text,
   enrollment_expires_at  timestamptz,
   interval_seconds       integer,
+  token_hash             text,
   last_seen_at           timestamptz,
   created_at             timestamptz NOT NULL DEFAULT now()
 );

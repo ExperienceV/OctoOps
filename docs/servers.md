@@ -6,9 +6,9 @@ Gestión y lectura de los servidores (nodos) monitoreados.
 
 | Método | Ruta | Auth | Descripción |
 |---|---|---|---|
-| `GET` | `/servers` | JWT | Lista los servidores del usuario. |
-| `POST` | `/servers` | JWT | Crea un servidor y devuelve el comando de instalación. |
-| `GET` | `/servers/:id` | JWT | Detalle de un servidor. |
+| `GET` | `/servers` | JWT | Lista los servidores/dispositivos del usuario. |
+| `POST` | `/servers` | JWT | Crea un servidor (install command) o un dispositivo (token). |
+| `GET` | `/servers/:id` | JWT | Detalle de un servidor/dispositivo. |
 | `GET` | `/servers/:id/metrics` | JWT | Historial de métricas. |
 | `GET` | `/servers/install/:token` | token | Script de instalación. |
 | `GET` | `/servers/install/bin` | público | Binario del agente. |
@@ -31,6 +31,7 @@ Respuesta `200`:
   {
     "id": "uuid",
     "name": "mi-vps",
+    "kind": "server",
     "status": "online",
     "interval_seconds": 10,
     "last_seen_at": "2026-10-19T20:50:06Z",
@@ -39,17 +40,34 @@ Respuesta `200`:
 ]
 ```
 
+`kind` puede ser `"server"` o `"device"`.
+
 `401` si no hay sesión.
 
 ## POST /servers
 
-Body: `{ "name": "mi-vps" }`.
+Body:
 
-Respuesta `200`:
+```json
+{ "name": "mi-vps", "kind": "server", "interval_seconds": 10 }
+```
+
+- `kind`: opcional, `"server"` (default) o `"device"`.
+- `interval_seconds`: opcional, default `10` (server) o `300` (device).
+
+**Server** → `200`:
 
 ```json
 { "install_command": "curl -fsSL https://octoops.com/servers/install/<token> | sh" }
 ```
+
+**Device** → `200`:
+
+```json
+{ "token": "ee360603ab6c…" }
+```
+
+> El token del device se muestra una sola vez y se guarda hasheado. No se puede recuperar después.
 
 ## GET /servers/:id
 
